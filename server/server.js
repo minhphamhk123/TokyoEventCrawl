@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { db } from './db.js';
 import { runCrawlForSetting } from './crawler.js';
-import { startScheduler, runStartupCheck } from './scheduler.js';
+import { startScheduler, runStartupCheck, runAllActiveCrawls } from './scheduler.js';
 
 const app = express();
 app.use(cors());
@@ -133,9 +133,30 @@ app.delete('/api/events/:id', async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 4000;
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// Scheduler trigger endpoint (tiện lợi cho Google Cloud Scheduler hoặc trigger thủ công)
+app.post('/api/scheduler/trigger', async (req, res) => {
+  try {
+    const force = req.query.force === 'true' || req.body?.force === true;
+    const results = await runAllActiveCrawls(force);
+    res.json({ success: true, timestamp: new Date().toISOString(), results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const port = process.env.PORT || 8080;
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port} (0.0.0.0)`);
   startScheduler();
   runStartupCheck();
 });
+
+// Xử lý đóng kết nối an toàn khi Cloud Run gửi tín hiệu SIGTERM
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received: Closing HTTP server gracefully...');
+  server.close(() => {
+    console.log('HTTP server closed.');
+    process.exit(0);
+  });
+});
+

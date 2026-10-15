@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: tokyo-event-server
+    restart: unless-stopped
+    ports:
+      # Map cổng 4000 host tới cổng 8080 trong container
+      - "4000:8080"
+    environment:
+      - PORT=8080
+      - NODE_ENV=production
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    volumes:
+      # Mount lưu trữ dữ liệu local khi test
+      - ./server/data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
