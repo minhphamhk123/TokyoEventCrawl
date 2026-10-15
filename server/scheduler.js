@@ -1,6 +1,36 @@
 import { db } from './db.js';
 import { runCrawlForSetting } from './crawler.js';
 
+export async function runAllActiveCrawls(force = false) {
+  console.log(`[Scheduler] Batch crawl requested (force: ${force})...`);
+  const now = new Date();
+  const activeSettings = await db.settings.find({ autoCrawlEnabled: true });
+  const results = [];
+
+  for (const setting of activeSettings) {
+    const lastCrawled = setting.lastCrawled ? new Date(setting.lastCrawled) : null;
+    const isCrawledToday = lastCrawled && 
+      lastCrawled.getDate() === now.getDate() && 
+      lastCrawled.getMonth() === now.getMonth() && 
+      lastCrawled.getFullYear() === now.getFullYear();
+
+    if (force || !isCrawledToday) {
+      try {
+        console.log(`[Scheduler] Running crawl for: "${setting.name}"...`);
+        const items = await runCrawlForSetting(setting);
+        results.push({ id: setting.id, name: setting.name, status: 'success', count: items.length });
+      } catch (err) {
+        console.error(`[Scheduler] Error crawling "${setting.name}":`, err.message);
+        results.push({ id: setting.id, name: setting.name, status: 'error', error: err.message });
+      }
+    } else {
+      results.push({ id: setting.id, name: setting.name, status: 'skipped', reason: 'already_crawled_today' });
+    }
+  }
+
+  return results;
+}
+
 export function startScheduler() {
   console.log('[Scheduler] Background auto-crawl scheduler initialized.');
 
@@ -10,22 +40,7 @@ export function startScheduler() {
       const now = new Date();
       // Check if it is morning (e.g. 7 AM)
       if (now.getHours() === 7) {
-        const activeSettings = await db.settings.find({ autoCrawlEnabled: true });
-        
-        for (const setting of activeSettings) {
-          const lastCrawled = setting.lastCrawled ? new Date(setting.lastCrawled) : null;
-          const isCrawledToday = lastCrawled && 
-            lastCrawled.getDate() === now.getDate() && 
-            lastCrawled.getMonth() === now.getMonth() && 
-            lastCrawled.getFullYear() === now.getFullYear();
-            
-          if (!isCrawledToday) {
-            console.log(`[Scheduler] Scheduled auto-crawl running for setting: "${setting.name}"...`);
-            await runCrawlForSetting(setting).catch(err => {
-              console.error(`[Scheduler] Error crawling "${setting.name}":`, err.message);
-            });
-          }
-        }
+        await runAllActiveCrawls(false);
       }
     } catch (err) {
       console.error('[Scheduler Loop Error]', err);

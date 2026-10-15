@@ -89,6 +89,7 @@ export async function runCrawlForSetting(setting, isPreview = false) {
     // Launch settings to prevent command prompt / GUI popups on Windows
     browser = await puppeteer.launch({
       headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

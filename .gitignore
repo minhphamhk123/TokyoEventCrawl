@@ -34,3 +34,4 @@ pnpm-debug.log*
 .env
 *.env.local
 .env.*.local
+github-ruleset.json

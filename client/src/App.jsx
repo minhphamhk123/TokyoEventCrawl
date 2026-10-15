@@ -4,7 +4,7 @@ import Navbar from './components/Navbar'
 import EventsDashboard from './components/EventsDashboard'
 import SettingsManager from './components/SettingsManager'
 
-const API_BASE = 'http://localhost:4000/api'
+const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
 function App() {
   // Navigation Routing Tab
